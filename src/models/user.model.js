@@ -53,7 +53,7 @@ userSchema.pre("save" , async function(next) {
     //if p/w me kuch modification hua hai tabhi jaise p/w save kr rhe hai ya update kiye tb
     if (!this.isModified("password")) return next();
 
-    this.password=bcrypt.hash(this.password , 10)
+    this.password=await bcrypt.hash(this.password , 10)
     next();
 
 })
