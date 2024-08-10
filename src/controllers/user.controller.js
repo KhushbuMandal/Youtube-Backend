@@ -7,6 +7,37 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 
 /*
  * / / / / / / / / / / / / / /
+ * GENERATE ACCESS AND REFRESH TOKEN - LOGIN CONTROLLER
+ *  / / / / / / / / / / / / / /
+ */
+
+const generateAccessAndRefreshTokens = async (userId) =>{
+    try {
+        // User ko userId se dhundhein
+        const user = await User.findById(userId);
+
+        // Access token aur refresh token generate karein
+        const accessToken = user.generateAccessToken()
+        const refreshToken = user.generateRefreshToken()
+
+        // Refresh token ko user object mein save karein
+        user.refreshToken = refreshToken;
+        //Save kr lia database me
+        await user.save({ validateBeforeSave : false });
+
+        return {accessToken , refreshToken}
+
+
+    } catch (error) {
+        throw new ApiError (500 , "Something went wrong while generating refresh and access token")
+    }
+}
+
+
+
+
+/*
+ * / / / / / / / / / / / / / /
  * REGISTER LOGIC
  *  / / / / / / / / / / / / / /
  */
@@ -103,6 +134,117 @@ const registerUser = asyncHandler( async (req , res) => {
 
 })
 
+
+/*
+ * / / / / / / / / / / / / / /
+ * LOGIN LOGIC
+ *  / / / / / / / / / / / / / /
+ */
+
+const loginUser = asyncHandler ( async (req , res) => {
+    // req.body se data prapt karein
+    // username aur email khali nahi hone chahiye
+    // username aur email dhundhein -> find user 
+    // password sahi hai ya nahi check karein
+    // refresh token generate karein
+    // access token generate karein
+    // cookie bhejein
+
+    //step 1 
+    const {email , username} = req.body;
+
+    // step - 2
+    if (!(username || email)) {
+        throw new ApiError (400 , "Username or email is required")
+    }
+
+    //step-3 
+    const user = await User.findOne ({
+        $or : [{username}  , {email}]
+    })
+
+    //user mila hi nhi 
+    if (!user) {
+        throw new ApiError(404 , "User does not exist")
+    }
+
+    //step - 4
+    const isPasswordValid = await user.isPasswordCorrect(password)
+
+    if (!isPasswordValid) {
+        throw new ApiError(401 , "Invalid user credentials")
+    }
+
+    //step -5  & 6
+    const {accessToken , refreshToken} = await generateAccessAndRefreshTokens(user._id)
+
+    //optional
+    const loggedInUser = await User.findById(user._id).select("-password -refreshToken")
+
+
+    //step - 7
+    const options = {
+        httpOnly : true,
+        secure : true
+    }
+
+    // response bhej rhe hai ki logged in ho gye hai
+    return res
+    .status(200)
+    .cookie("accessToken" , accessToken , options)
+    .cookie("refreshToken" , refreshToken , options)
+    .json(
+        new ApiResponse(
+            200,
+            {
+                user : loggedInUser , accessToken , refreshToken
+            },
+            "User logged In Sucessfully"
+        )
+    )
+})
+
+/*
+  * / / / / / / / / / / / / / /
+ * LOGOUT LOGIC
+ *  / / / / / / / / / / / / / /
+ */
+
+const logoutUser = asyncHandler( async (req, res) => {
+    //req.user._id
+    //User ke ID ke basis par refreshToken ko unset karein
+    await User.findByIdAndUpdate(
+        req.user._id,
+        {
+            $set : {
+                refreshToken : undefined
+            }
+        },
+        {
+            new : true
+        }
+    )
+
+    // Cookie options
+    const options = {
+        httpOnly: true, // HTTP only cookie, JavaScript ke through access nahi hoga
+        secure: true    // Secure cookie, HTTPS ke through hi access hoga
+    }
+
+    // Success response bhejein, aur cookies ko clear karein
+    return res
+    .status(200)
+    .clearCookie("accessToken", options)
+    .clearCookie("refreshToken", options)
+    .json(new ApiResponse(200, {}, "User logged Out"))
+
+
+})
+
+
+
 export {
-    registerUser
+    registerUser,
+    loginUser,
+    logoutUser
 }
