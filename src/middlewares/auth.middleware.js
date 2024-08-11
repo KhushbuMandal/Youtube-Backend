@@ -1,7 +1,7 @@
-import { ApiError } from "../utils/ApiError";
-import { asyncHandler } from "../utils/asyncHandler";
+import { ApiError } from "../utils/ApiError.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 import jwt from "jsonwebtoken";
-import { User } from "../models/user.model";
+import { User } from "../models/user.model.js";
 
 // JWT ko verify karne ke liye middleware 
 // agar res ka koii use nhi hota h to uski jagah pe hum ye _ dal sakte h
@@ -26,10 +26,12 @@ export const verifyJWT = asyncHandler (async (req , _ , next) => {
             // Agar user nahi mila toh error throw karein
             throw new ApiError(401, "Invalid Access Token")
         }
-    
+        
+        // Request object mein user ko add karein
         req.user = user;
         next();
     } catch (error) {
+        // Koi error aaye toh use catch karein aur error throw karein
         throw new ApiError(401 , error?.message || "Invalid access token")
     }
 
